@@ -99,6 +99,7 @@ class Api(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.srv.shutdown()
+        cls.srv.server_close()
 
     def llamar(self, ruta, cuerpo=None, metodo=None):
         cab = {"Content-Type": "application/json"}

@@ -137,8 +137,11 @@ def conectar() -> sqlite3.Connection:
 
 
 def iniciar_bd() -> None:
-    with conectar() as con:
+    con = conectar()
+    try:
         con.executescript(SCHEMA)
+    finally:
+        con.close()
 
 
 def auditar(con, usuario_id, accion, detalle) -> None:
@@ -499,6 +502,13 @@ class Manejador(BaseHTTPRequestHandler):
 
     # ---- respuestas
     def enviar(self, estado: int, cuerpo: bytes, tipo: str, extra: dict | None = None):
+        # Guardar en disco ANTES de responder: así la siguiente petición ya ve los cambios
+        con = getattr(self, "_con", None)
+        if con is not None and con.in_transaction:
+            if 200 <= estado < 300:
+                con.commit()
+            else:
+                con.rollback()
         self.send_response(estado)
         self.send_header("Content-Type", tipo)
         self.send_header("Content-Length", str(len(cuerpo)))
@@ -570,9 +580,16 @@ class Manejador(BaseHTTPRequestHandler):
         try:
             if not ruta.startswith("/api/"):
                 return self.estatico(ruta)
-            with conectar() as con:
-                return self.api(con, metodo, ruta)
+            con = conectar()
+            self._con = con
+            try:
+                with con:
+                    return self.api(con, metodo, ruta)
+            finally:
+                self._con = None
+                con.close()
         except ErrorUsuario as e:
+            self._con = None
             self.json(e.estado, {"error": e.mensaje})
         except sqlite3.IntegrityError:
             self.json(409, {"error": "Ese registro ya existe o hace referencia a un producto que no existe."})
