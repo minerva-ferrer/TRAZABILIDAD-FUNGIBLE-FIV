@@ -1,0 +1,13 @@
+services:
+  trazabilidad:
+    build: .
+    container_name: trazabilidad-fiv
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./datos:/datos
+    environment:
+      # Opcional: clave para leer fotos de hojas manuscritas
+      # ANTHROPIC_API_KEY: "sk-ant-..."
+      TZ: Europe/Madrid

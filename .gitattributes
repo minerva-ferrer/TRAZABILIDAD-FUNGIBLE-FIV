@@ -1,0 +1,5 @@
+*.bat text eol=crlf
+*.pdf binary
+*.ttf binary
+*.jpg binary
+LEEME-WINDOWS.txt text eol=crlf

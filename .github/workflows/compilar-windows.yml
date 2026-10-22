@@ -1,0 +1,58 @@
+# Genera el programa para Windows (TrazabilidadFIV.exe) sin que nadie tenga que instalar Python.
+# Se ejecuta al publicar una versión (etiqueta v1.0.0, v1.1.0…) o a mano desde la pestaña Actions.
+name: Compilar programa para Windows
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Pruebas automáticas
+        run: python -m unittest discover -s pruebas -v
+
+      - name: Crear TrazabilidadFIV.exe
+        run: >
+          pyinstaller --noconfirm --onefile --name TrazabilidadFIV
+          --add-data "static;static"
+          --add-data "historico;historico"
+          --add-data "herramientas/fuentes;herramientas/fuentes"
+          --hidden-import herramientas.generar_hoja
+          --collect-submodules reportlab.graphics.barcode
+          app.py
+
+      - name: Preparar paquete
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force paquete | Out-Null
+          Copy-Item dist/TrazabilidadFIV.exe paquete/
+          Copy-Item LEEME-WINDOWS.txt paquete/
+          Copy-Item datos/config.ejemplo.json paquete/config.ejemplo.json
+          Compress-Archive -Path paquete/* -DestinationPath TrazabilidadFIV-windows.zip
+
+      - name: Guardar como artefacto de la ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrazabilidadFIV-windows
+          path: TrazabilidadFIV-windows.zip
+
+      - name: Adjuntar a la versión publicada
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TrazabilidadFIV-windows.zip

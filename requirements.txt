@@ -1,0 +1,4 @@
+# El programa principal (app.py) solo necesita Python 3.9 o posterior.
+# Estos paquetes son opcionales:
+pypdf>=4.0        # importar las hojas PDF rellenadas en el ordenador
+reportlab>=4.0    # generar hojas PDF nuevas (herramientas/generar_hoja.py)

@@ -1,0 +1,33 @@
+TRAZABILIDAD DE FUNGIBLE - LABORATORIO DE FIV
+=============================================
+
+No hace falta instalar nada.
+
+1. Copia la carpeta en el PC del laboratorio que hará de "servidor"
+   (por ejemplo C:\Trazabilidad). Ese PC debe estar encendido mientras se use.
+
+2. Haz doble clic en TrazabilidadFIV.exe.
+   - La primera vez, Windows puede mostrar "Windows protegió su PC".
+     Pulsa "Más información" y luego "Ejecutar de todas formas".
+   - Si pregunta por el cortafuegos, permite el acceso en redes privadas.
+
+3. Se abre una ventana negra (es el programa en marcha: no la cierres)
+   y el navegador en http://localhost:8000
+
+4. La primera vez, crea tu usuario administrador. Después carga el histórico
+   en Usuarios > Cargar histórico de un producto (archivo .json).
+
+5. Los demás PCs del laboratorio entran desde el navegador en
+   http://NOMBRE-DE-ESTE-PC:8000
+
+DATOS
+- Todo se guarda en la carpeta "datos", junto a TrazabilidadFIV.exe.
+- Copia esa carpeta a menudo (por ejemplo, cada día a una unidad de red).
+- Para actualizar el programa, sustituye solo TrazabilidadFIV.exe. No borres "datos".
+
+HOJAS EN PDF
+- En la ficha de cada producto, "Descargar hoja en blanco (PDF)".
+
+LECTURA DE FOTOS (opcional)
+- Copia config.ejemplo.json dentro de la carpeta "datos" con el nombre config.json,
+  pon la clave de la API de Anthropic y reinicia el programa.

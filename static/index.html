@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trazabilidad de fungible · FIV</title>
+<link rel="icon" href="logo-crea.jpg">
+<style>
+@font-face{font-family:"Montserrat";src:url(fuentes/Montserrat-Bold.ttf) format("truetype");font-weight:700;font-display:swap}
+@font-face{font-family:"Open Sans";src:url(fuentes/OpenSans-Regular.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:"Open Sans";src:url(fuentes/OpenSans-Bold.ttf) format("truetype");font-weight:600 700;font-display:swap}
+/* Herramienta de laboratorio con la identidad de CREA: azul oscuro para la estructura, naranja pastel para acentos */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --sunk:#edf1f3; --line:#d4dde2; --fg:#0f2733; --muted:#4f6672;
+  --brand:#033953; --brand-ink:#ffffff; --accent:#f7b086; --accent-soft:#fdebe0;
+  --ok:#1f7a3d; --ok-soft:#e0f2e6; --warn:#8a5a00; --warn-soft:#fbefd2; --bad:#b3261e; --bad-soft:#fbe3e0;
+  --f-title:"Montserrat",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --f-ui:"Open Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --f-mono:ui-monospace,"Cascadia Mono","Consolas","SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0c171d; --surface:#132129; --sunk:#0f1c23; --line:#273a44; --fg:#e3ecf0; --muted:#9db1bb;
+  --brand:#8cc4e0; --brand-ink:#04202e; --accent:#f7b086; --accent-soft:#3a2619;
+  --ok:#6fcf8e; --ok-soft:#173222; --warn:#e8b75a; --warn-soft:#3a2d12; --bad:#f08a80; --bad-soft:#3d1a17; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px))}
+header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:3px solid var(--accent)}
+header.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-block:8px}
+.brand{display:flex;align-items:center;gap:14px;margin-right:auto}
+.brand img{height:30px;width:auto;display:block;border-radius:4px}
+.brand span{font-family:var(--f-title);font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap}
+nav.tabs a{padding:7px 12px;border-radius:999px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px}
+nav.tabs a[aria-current="page"]{background:var(--brand);color:var(--brand-ink)}
+nav.tabs a:hover{color:var(--fg)} nav.tabs a[aria-current="page"]:hover{color:var(--brand-ink)}
+.count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--accent);color:#3b1d0c;font-size:12px;font-weight:700;text-align:center}
+.who{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
+main{padding-block:24px 64px}
+section.view{display:flex;flex-direction:column;gap:20px}
+h1{font-family:var(--f-title);font-size:24px;margin:0;color:var(--brand);text-wrap:balance}
+h2{font-family:var(--f-title);font-size:16px;margin:0;color:var(--brand)}
+.sub{color:var(--muted);margin:2px 0 0;font-size:14px}
+.head-row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.stats{display:flex;flex-wrap:wrap;gap:10px}
+.stat{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.stat b{font-family:var(--f-title);font-size:22px;font-variant-numeric:tabular-nums;line-height:1}
+.stat span{font-size:13px;color:var(--muted);line-height:1.2}
+.stat.warn{border-color:var(--warn);background:var(--warn-soft)} .stat.bad{border-color:var(--bad);background:var(--bad-soft)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.pad{padding:16px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr.link{cursor:pointer} tbody tr.link:hover{background:var(--sunk)}
+tr.is-change td{background:var(--accent-soft)}
+tr.anulada td{color:var(--muted);text-decoration:line-through}
+tr.anulada td.keep{text-decoration:none}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13.5px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.acc{background:var(--accent-soft);color:var(--fg);border-color:var(--accent)} .chip.line{border-color:var(--line);color:var(--muted)}
+button,.btn{font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:8px 16px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button.primary,.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+button:disabled{opacity:.55;cursor:not-allowed}
+button.ghost{background:transparent;border-color:transparent;color:var(--brand);padding-inline:6px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select{font:inherit;font-size:14px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+label{font-size:13px;font-weight:600;display:flex;flex-direction:column;gap:4px}
+label.inline{flex-direction:row;align-items:center;gap:8px;font-weight:400}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);font-size:16px;margin-bottom:4px}
+details.add>summary{cursor:pointer;font-weight:700;color:var(--brand);list-style:none}
+details.add>summary::-webkit-details-marker{display:none}
+details.add[open]>summary{margin-bottom:12px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.kv{display:flex;flex-direction:column;gap:2px;padding:14px 16px}
+.kv span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kv b{font-size:18px}
+.alerts{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.alerts li{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-radius:8px;background:var(--warn-soft);font-size:14px}
+.timeline{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.timeline li{display:grid;grid-template-columns:14px minmax(0,1fr);gap:12px;padding-bottom:14px;position:relative}
+.timeline li::before{content:"";position:absolute;left:6px;top:14px;bottom:0;width:2px;background:var(--line)}
+.timeline li:last-child::before{display:none}
+.dot{width:14px;height:14px;border-radius:50%;border:3px solid var(--brand);background:var(--surface);margin-top:3px}
+.timeline li.current .dot{background:var(--accent);border-color:var(--brand)}
+.tl-main{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.tl-main .mono{font-size:15px;font-weight:600}
+.change-list{display:flex;flex-direction:column;gap:10px}
+.change{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;padding:14px 16px;align-items:start}
+.change .what{display:flex;flex-direction:column;gap:4px;min-width:0}
+.arrow{color:var(--muted);padding:0 4px}
+.review{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.review input{width:220px;max-width:100%}
+@media (max-width:640px){.change{grid-template-columns:minmax(0,1fr)}.review{justify-content:flex-start}}
+.scan-grid{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.scan-grid{grid-template-columns:minmax(0,1fr)}}
+.preview{border:1px dashed var(--line);border-radius:10px;min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;overflow:hidden;background:var(--sunk);text-align:center;padding:8px}
+.preview img{display:block;width:100%;height:auto}
+.review-tbl td{padding:6px 5px} .review-tbl input{width:100%;padding:5px 6px;font-size:13px}
+.w-date{min-width:138px} .w-lot{min-width:118px} .w-sm{min-width:60px} .w-sup{min-width:110px}
+tr.doubt td{background:var(--warn-soft)} tr.dup td{opacity:.6}
+input.doubt{border-color:var(--warn);border-width:2px}
+.status{font-size:14px;color:var(--muted)} .status.err{color:var(--bad)}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+.back{align-self:flex-start}
+.login{max-width:420px;margin:8vh auto 0;display:flex;flex-direction:column;gap:16px;padding:28px}
+.login img{height:44px;width:auto;align-self:flex-start}
+.inline-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.inline-form input{flex:1 1 220px}
+</style>
+</head>
+<body>
+<header class="top" id="topbar" hidden>
+  <div class="wrap">
+    <div class="brand"><img src="logo-crea.jpg" alt="CREA"><span>Trazabilidad de fungible</span></div>
+    <nav class="tabs" aria-label="Secciones">
+      <a href="#panel" data-tab="panel">Panel</a>
+      <a href="#registrar" data-tab="registrar">Registrar hoja</a>
+      <a href="#cambios" data-tab="cambios">Cambios<span class="count" id="pendCount" hidden></span></a>
+      <a href="#usuarios" data-tab="usuarios" id="tabUsuarios" hidden>Usuarios</a>
+    </nav>
+    <div class="who"><span id="whoName"></span><button class="ghost" id="logoutBtn" type="button">Salir</button></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ACCESO -->
+  <section class="view" id="v-acceso" hidden>
+    <form class="panel login" id="loginForm">
+      <img src="logo-crea.jpg" alt="CREA">
+      <div><h1 id="loginTitle">Iniciar sesión</h1><p class="sub" id="loginSub">Trazabilidad de material fungible del laboratorio de FIV.</p></div>
+      <div id="setupFields" hidden style="display:flex;flex-direction:column;gap:12px">
+        <label for="lNombre">Nombre completo<input id="lNombre" autocomplete="name"></label>
+      </div>
+      <label for="lUsuario">Usuario<input id="lUsuario" autocomplete="username" required></label>
+      <label for="lClave">Contraseña<input id="lClave" type="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit" id="loginBtn">Entrar</button>
+      <div class="status" id="loginStatus" role="status"></div>
+    </form>
+  </section>
+
+  <!-- PANEL -->
+  <section class="view" id="v-panel" hidden>
+    <div class="head-row">
+      <div><h1>Estado de los productos</h1><p class="sub">Lote en uso de cada producto según la última recepción registrada.</p></div>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="panel"><div class="tbl-wrap" id="prodTable"></div></div>
+    <div class="panel pad">
+      <details class="add" id="addProd">
+        <summary>+ Añadir producto</summary>
+        <form id="prodForm" class="form-grid">
+          <label for="pCode">Código<input id="pCode" required placeholder="327-26"></label>
+          <label for="pName" style="grid-column:span 2">Descripción<input id="pName" required placeholder="Rack puntas largas 1–200 µl · 91 mm"></label>
+          <label for="pRefs" style="grid-column:1/-1">Proveedores admitidos (separados por comas)<input id="pRefs" placeholder="Concile TF-200-HS, Neptune, Nordic Cell 33012"></label>
+          <div class="row"><button class="primary" type="submit">Guardar producto</button></div>
+        </form>
+      </details>
+    </div>
+    <div class="row small muted"><span>Exportar:</span>
+      <a class="btn" href="api/exportar/recepciones.csv">Recepciones (CSV)</a>
+      <a class="btn" href="api/exportar/cambios.csv">Cambios (CSV)</a>
+    </div>
+  </section>
+
+  <!-- PRODUCTO -->
+  <section class="view" id="v-producto" hidden></section>
+
+  <!-- REGISTRAR -->
+  <section class="view" id="v-registrar" hidden>
+    <div><h1>Registrar una hoja</h1><p class="sub">Sube el PDF rellenado o la foto de la hoja en papel. Revisa lo leído antes de confirmar: solo lo confirmado entra en el registro.</p></div>
+    <div class="scan-grid">
+      <div class="panel pad" style="display:flex;flex-direction:column;gap:12px">
+        <label for="scanProd">Producto<select id="scanProd"></select></label>
+        <label for="pdfFile" id="pdfLabel">PDF rellenado
+          <input id="pdfFile" type="file" accept="application/pdf">
+        </label>
+        <label for="scanFile" id="imgLabel">Foto o escaneo de la hoja (JPG o PNG)
+          <input id="scanFile" type="file" accept="image/jpeg,image/png,image/webp">
+        </label>
+        <div class="preview" id="scanPreview">Sin archivo</div>
+        <div class="row"><button class="primary" id="scanBtn" type="button" disabled>Leer hoja</button></div>
+        <div class="status" id="scanStatus" role="status"></div>
+      </div>
+      <div class="panel pad" style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <h2>Filas para revisar</h2>
+        <div id="reviewArea" class="empty"><b>Aún no hay filas</b>Lee una hoja o añade una recepción a mano.</div>
+        <div class="row">
+          <button type="button" id="addManual">+ Añadir fila a mano</button>
+          <button class="primary" type="button" id="confirmBtn" disabled>Confirmar filas marcadas</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAMBIOS -->
+  <section class="view" id="v-cambios" hidden>
+    <div class="head-row">
+      <div><h1>Registro de cambios</h1><p class="sub">Cada cambio de lote, proveedor o caducidad entre dos recepciones seguidas del mismo producto.</p></div>
+      <div class="row">
+        <select id="chFilter" aria-label="Filtrar cambios"><option value="pend">Pendientes de revisar</option><option value="all">Todos</option></select>
+        <select id="chProd" aria-label="Filtrar por producto"></select>
+        <a class="btn" href="api/exportar/cambios.csv">Exportar CSV</a>
+      </div>
+    </div>
+    <div class="change-list" id="changeList"></div>
+  </section>
+
+  <!-- USUARIOS -->
+  <section class="view" id="v-usuarios" hidden>
+    <div class="head-row">
+      <div><h1>Usuarios</h1><p class="sub">Quién puede entrar y confirmar registros. Los usuarios no se borran: se desactivan, para que el historial siga mostrando su nombre.</p></div>
+      <a class="btn" href="api/exportar/auditoria.csv">Exportar registro de auditoría</a>
+    </div>
+    <div class="panel"><div class="tbl-wrap" id="userTable"></div></div>
+    <div class="panel pad">
+      <details class="add"><summary>+ Añadir usuario</summary>
+        <form id="userForm" class="form-grid">
+          <label for="uNombre">Nombre completo<input id="uNombre" required></label>
+          <label for="uUsuario">Usuario<input id="uUsuario" required placeholder="nombre.apellido"></label>
+          <label for="uClave">Contraseña inicial<input id="uClave" type="password" required minlength="8"></label>
+          <label class="inline" for="uAdmin"><input id="uAdmin" type="checkbox"> Administrador</label>
+          <div class="row"><button class="primary" type="submit">Crear usuario</button></div>
+        </form>
+      </details>
+    </div>
+    <div class="panel pad" style="display:flex;flex-direction:column;gap:10px">
+      <h2>Cargar histórico de un producto</h2>
+      <p class="sub" style="margin:0">Archivo .json con el histórico transcrito de las hojas en papel (por ejemplo <span class="mono">327-26.json</span>). Si el producto ya existe, no se vuelve a cargar.</p>
+      <div class="row"><input id="histFile" type="file" accept="application/json,.json" aria-label="Archivo de histórico"><button class="primary" type="button" id="histBtn" disabled>Cargar</button></div>
+    </div>
+  </section>
+</main>
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s||'').replace(/\*/g,'').trim().toUpperCase().replace(/\s+/g,'');
+let INFO=null, ME=null, EST={productos:[]}, view='panel', curProduct=null;
+
+/* ---------- API ---------- */
+async function api(path,opts){
+  opts=opts||{};
+  const r=await fetch('api/'+path,{method:opts.method||'GET',headers:opts.body?{'Content-Type':'application/json'}:{},body:opts.body?JSON.stringify(opts.body):undefined,credentials:'same-origin'});
+  let data={};try{data=await r.json();}catch(e){}
+  if(r.status===401&&path!=='entrar'){ME=null;showLogin();}
+  if(!r.ok)throw new Error(data.error||'Error '+r.status);
+  return data;
+}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>{t.hidden=true;},3500);}
+const fileB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
+
+/* ---------- fechas ---------- */
+function fmtDate(iso){if(!iso)return '—';const p=String(iso).split('-');if(p.length===2)return p[1]+'/'+p[0];if(p.length===3)return p[2]+'/'+p[1]+'/'+p[0];return esc(iso);}
+function today(){const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
+function expChip(iso,d){if(!iso)return '<span class="muted">—</span>';const l=fmtDate(iso);
+  if(d==null)return '<span class="chip line">'+l+'</span>';
+  if(d<0)return '<span class="chip bad">Caducado · '+l+'</span>';
+  if(d<=90)return '<span class="chip warn">'+l+' · '+d+' días</span>';
+  return '<span class="chip ok">'+l+'</span>';}
+function daysTo(iso){if(!iso)return null;const p=iso.split('-').map(Number);const e=p.length===2?new Date(p[0],p[1],0):new Date(p[0],p[1]-1,p[2]);const t=new Date();t.setHours(0,0,0,0);return Math.round((e-t)/864e5);}
+
+/* ---------- acceso ---------- */
+function showLogin(){
+  $('#topbar').hidden=true;['panel','producto','registrar','cambios','usuarios'].forEach(k=>$('#v-'+k).hidden=true);$('#v-acceso').hidden=false;
+  const setup=INFO&&!INFO.hay_usuarios;
+  $('#setupFields').hidden=!setup;$('#lNombre').required=!!setup;
+  $('#loginTitle').textContent=setup?'Crear el primer administrador':'Iniciar sesión';
+  $('#loginSub').textContent=setup?'Aún no hay usuarios. Crea el tuyo: tendrás permisos de administrador.':'Trazabilidad de material fungible del laboratorio de FIV.';
+  $('#loginBtn').textContent=setup?'Crear y entrar':'Entrar';
+  $('#lClave').autocomplete=setup?'new-password':'current-password';
+}
+$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const st=$('#loginStatus');st.textContent='';st.classList.remove('err');
+  const body={usuario:$('#lUsuario').value.trim(),clave:$('#lClave').value,nombre:$('#lNombre').value.trim()};
+  try{await api(INFO&&!INFO.hay_usuarios?'primer-usuario':'entrar',{method:'POST',body});$('#lClave').value='';await arrancar();}
+  catch(err){st.textContent=err.message;st.classList.add('err');}});
+$('#logoutBtn').addEventListener('click',async()=>{try{await api('salir',{method:'POST'});}catch(e){}ME=null;INFO=await api('inicio');showLogin();});
+
+/* ---------- vistas ---------- */
+function setView(v){view=v;$('#v-acceso').hidden=true;
+  ['panel','producto','registrar','cambios','usuarios'].forEach(k=>{$('#v-'+k).hidden=(k!==v);});
+  document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.dataset.tab===v||(v==='producto'&&a.dataset.tab==='panel'))a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
+  render();window.scrollTo(0,0);if(v==='usuarios')loadUsers();}
+function route(){if(!ME)return;const h=(location.hash||'').slice(1);
+  if(h.indexOf('p-')===0){curProduct=decodeURIComponent(h.slice(2));setView('producto');}
+  else if(['registrar','cambios'].includes(h)||(h==='usuarios'&&ME.admin))setView(h);else setView('panel');}
+window.addEventListener('hashchange',route);
+
+const prod=code=>EST.productos.find(p=>p.codigo===code);
+const allChanges=()=>EST.productos.flatMap(p=>p.cambios.map(c=>Object.assign({producto:p.codigo,nombreProducto:p.nombre},c)));
+
+function render(){
+  const pend=allChanges().filter(c=>!c.revision).length;
+  const pc=$('#pendCount');pc.hidden=!pend;pc.textContent=pend;
+  fillSelects();
+  if(view==='panel')renderPanel();
+  if(view==='producto')renderProduct();
+  if(view==='cambios')renderChanges();
+}
+
+function renderPanel(){
+  const ps=EST.productos;
+  if(!ps.length){$('#stats').innerHTML='';$('#prodTable').innerHTML='<div class="empty"><b>Todavía no hay productos</b>Añade el primero con «Añadir producto».</div>';return;}
+  let soon=0,expired=0;
+  const rows=ps.map(p=>{const last=p.ultima,pend=p.cambios.filter(c=>!c.revision).length,d=p.dias_caducidad,lastCh=p.cambios[p.cambios.length-1];
+    if(d!=null){if(d<0)expired++;else if(d<=90)soon++;}
+    return '<tr class="link" tabindex="0" data-go="'+esc(p.codigo)+'"><td><div class="mono" style="font-weight:700">'+esc(p.codigo)+'</div><div class="muted small">'+esc(p.nombre)+'</div></td>'+
+      '<td class="mono">'+(last?esc(last.lote):'—')+'</td><td>'+(last&&last.proveedor?esc(last.proveedor):'<span class="muted">—</span>')+'</td>'+
+      '<td>'+(last?expChip(last.caducidad,d):'—')+'</td><td class="mono">'+(last?fmtDate(last.fecha):'—')+'</td>'+
+      '<td>'+(lastCh?'<span class="mono">'+fmtDate(lastCh.fecha)+'</span> <span class="muted">'+lastCh.tipos.join(', ')+'</span>':'<span class="muted">—</span>')+'</td>'+
+      '<td>'+(pend?'<span class="chip warn">'+pend+' por revisar</span>':'<span class="chip ok">Al día</span>')+'</td></tr>';}).join('');
+  const pend=allChanges().filter(c=>!c.revision).length;
+  $('#stats').innerHTML='<div class="stat"><b>'+ps.length+'</b><span>productos</span></div>'+
+    '<div class="stat'+(pend?' warn':'')+'"><b>'+pend+'</b><span>cambios sin<br>revisar</span></div>'+
+    '<div class="stat'+(soon?' warn':'')+'"><b>'+soon+'</b><span>lotes caducan<br>en ≤ 90 días</span></div>'+
+    '<div class="stat'+(expired?' bad':'')+'"><b>'+expired+'</b><span>lotes en uso<br>caducados</span></div>';
+  $('#prodTable').innerHTML='<table><thead><tr><th>Producto</th><th>Lote en uso</th><th>Proveedor</th><th>Caducidad</th><th>Últ. recepción</th><th>Último cambio</th><th>Revisión</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+function lotRuns(rs){const runs=[];rs.filter(r=>!r.anulada).forEach(r=>{const last=runs[runs.length-1];
+  if(last&&norm(last.lote)===norm(r.lote)){last.to=r;last.n++;last.cajas+=(parseInt(r.cajas,10)||0);if(r.proveedor&&!last.provs.includes(r.proveedor))last.provs.push(r.proveedor);}
+  else runs.push({lote:r.lote,from:r,to:r,n:1,cajas:parseInt(r.cajas,10)||0,cad:r.caducidad,provs:r.proveedor?[r.proveedor]:[]});});return runs;}
+
+function renderProduct(){
+  const box=$('#v-producto'),p=prod(curProduct);
+  if(!p){box.innerHTML='<a class="btn back" href="#panel">← Panel</a><div class="panel empty"><b>No existe el producto '+esc(curProduct)+'</b></div>';return;}
+  const rs=p.recepciones,last=p.ultima,runs=lotRuns(rs),chIds={};p.cambios.forEach(c=>{chIds[c.id]=c.tipos;});
+  let h='<a class="btn back" href="#panel">← Panel</a><div class="head-row"><div><div class="mono muted">'+esc(p.codigo)+'</div><h1>'+esc(p.nombre)+'</h1>'+
+    '<div class="row" style="margin-top:8px">'+p.proveedores.map(x=>'<span class="chip line">'+esc(x.nombre)+'</span>').join('')+'</div></div>'+
+    '<div class="row">'+(INFO&&INFO.generar_hojas?'<a class="btn" href="api/hoja/'+encodeURIComponent(p.codigo)+'.pdf">Descargar hoja en blanco (PDF)</a>':'')+
+    '<a class="btn primary" href="#registrar" data-scanfor="'+esc(p.codigo)+'">Registrar hoja de este producto</a></div></div>';
+  h+='<div class="cols"><div class="panel kv"><span>Lote en uso</span><b class="mono">'+(last?esc(last.lote):'—')+'</b></div>'+
+    '<div class="panel kv"><span>Caducidad del lote en uso</span><b>'+(last?expChip(last.caducidad,p.dias_caducidad):'—')+'</b></div>'+
+    '<div class="panel kv"><span>Recepciones registradas</span><b>'+rs.filter(r=>!r.anulada).length+'</b></div></div>';
+  if(p.anomalias.length)h+='<div class="panel pad" style="display:flex;flex-direction:column;gap:10px"><h2>Para revisar en el registro ('+p.anomalias.length+')</h2><ul class="alerts">'+
+    p.anomalias.map(a=>'<li><span class="mono">'+fmtDate(a.fecha)+'</span><span>'+esc(a.mensaje)+'</span></li>').join('')+'</ul></div>';
+  h+='<div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class="panel pad" style="display:flex;flex-direction:column;gap:14px"><h2>Historia de lotes</h2><ul class="timeline">'+
+    runs.slice().reverse().map((r,i)=>'<li class="'+(i===0?'current':'')+'"><span class="dot" aria-hidden="true"></span><div><div class="tl-main"><span class="mono">'+esc(r.lote)+'</span>'+(i===0?'<span class="chip acc">En uso</span>':'')+
+      '<span class="muted small">'+esc(r.provs.join(' / ')||'Proveedor no anotado')+'</span></div><div class="muted small">'+fmtDate(r.from.fecha)+(r.n>1?' → '+fmtDate(r.to.fecha):'')+' · '+r.n+' recep. · '+r.cajas+' cajas · desde FIV '+esc(r.from.fiv||'—')+' · cad. '+fmtDate(r.cad)+'</div></div></li>').join('')+
+    '</ul></div><div class="panel" style="min-width:0"><div class="pad"><h2>Recepciones</h2></div><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Proveedor</th><th class="num">Cajas</th><th>Lote</th><th>Caducidad</th><th>Nº FIV</th><th>Firma</th><th>Registro</th><th></th></tr></thead><tbody>'+
+    rs.slice().reverse().map(r=>'<tr class="'+(r.anulada?'anulada':(chIds[r.id]?'is-change':''))+'"><td class="mono">'+fmtDate(r.fecha)+(chIds[r.id]&&!r.anulada?'<div><span class="chip acc">Cambio de '+chIds[r.id].join(' y ')+'</span></div>':'')+'</td>'+
+      '<td>'+esc(r.proveedor||'—')+'</td><td class="num">'+esc(r.cajas)+'</td><td class="mono">'+esc(r.lote)+'</td><td class="mono">'+fmtDate(r.caducidad)+'</td><td class="mono">'+esc(r.fiv||'—')+'</td><td>'+esc(r.firma)+'</td>'+
+      '<td class="muted small keep">'+(r.origen==='historico'?'Carga del histórico':esc(r.confirmado_por_nombre||'—')+' · '+esc(r.origen))+(r.notas?'<div>'+esc(r.notas)+'</div>':'')+
+      (r.anulada?'<div><span class="chip bad">Anulada</span> '+esc(r.anulada_por_nombre||'')+' · '+esc(r.motivo_anulacion)+'</div>':'')+'</td>'+
+      '<td class="keep">'+(r.anulada?'':'<button class="ghost small" type="button" data-anular="'+esc(r.id)+'">Anular</button>')+'</td></tr>').join('')+
+    '</tbody></table></div></div></div>';
+  box.innerHTML=h;
+}
+
+function renderChanges(){
+  const f=$('#chFilter').value,pf=$('#chProd').value;
+  const list=allChanges().filter(c=>(!pf||c.producto===pf)&&(f==='all'||!c.revision)).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+  const el=$('#changeList');
+  if(!list.length){el.innerHTML='<div class="panel empty"><b>'+(f==='pend'?'No hay cambios pendientes de revisar':'No hay cambios registrados')+'</b>'+(f==='pend'?'Cuando una recepción traiga otro lote, proveedor o caducidad aparecerá aquí.':'')+'</div>';return;}
+  el.innerHTML=list.map(c=>{const a=c.antes,d=c.despues,r=c.revision,parts=[];
+    if(c.tipos.includes('lote'))parts.push('<div>Lote <span class="mono">'+esc(a.lote)+'</span><span class="arrow">→</span><span class="mono" style="font-weight:700">'+esc(d.lote)+'</span></div>');
+    if(c.tipos.includes('proveedor'))parts.push('<div>Proveedor '+esc(a.proveedor)+'<span class="arrow">→</span><b>'+esc(d.proveedor)+'</b></div>');
+    if(c.tipos.includes('caducidad'))parts.push('<div>Caducidad <span class="mono">'+fmtDate(a.caducidad)+'</span><span class="arrow">→</span><span class="mono">'+fmtDate(d.caducidad)+'</span></div>');
+    const rev=r?'<div class="review"><span class="chip ok">Revisado</span><span class="muted small">'+esc(r.revisado_por_nombre||'')+' · '+fmtDate(String(r.fecha).slice(0,10))+(r.nota?' · '+esc(r.nota):'')+'</span><button class="ghost" data-unack="'+esc(c.id)+'" type="button">Deshacer</button></div>':
+      '<div class="review"><input id="note-'+esc(c.id)+'" placeholder="Nota (opcional)" aria-label="Nota de revisión"><button class="primary" type="button" data-ack="'+esc(c.id)+'">Marcar revisado</button></div>';
+    return '<article class="panel change"><div class="what"><div class="row" style="gap:8px"><span class="mono">'+fmtDate(c.fecha)+'</span><a href="#p-'+encodeURIComponent(c.producto)+'" class="mono" style="color:var(--brand);font-weight:700">'+esc(c.producto)+'</a>'+
+      c.tipos.map(t=>'<span class="chip acc">'+t+'</span>').join('')+'</div>'+parts.join('')+'<div class="muted small">Aplica desde el nº FIV '+esc(c.fiv||'(sin anotar)')+' · '+esc(c.nombreProducto)+'</div></div>'+rev+'</article>';}).join('');
+}
+
+function fillSelects(){
+  const opts=EST.productos.map(p=>'<option value="'+esc(p.codigo)+'">'+esc(p.codigo)+' · '+esc(p.nombre)+'</option>').join('');
+  [['#scanProd','Elige el producto'],['#chProd','Todos los productos']].forEach(([sel,first])=>{const s=$(sel);if(document.activeElement===s)return;const v=s.value;
+    s.innerHTML='<option value="">'+first+'</option>'+opts;if(EST.productos.some(p=>p.codigo===v))s.value=v;});
+}
+
+async function refresh(){try{EST=await api('estado');render();}catch(e){if(ME)toast(e.message);}}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',async e=>{
+  const tr=e.target.closest('tr[data-go]');if(tr){location.hash='p-'+encodeURIComponent(tr.dataset.go);return;}
+  const sf=e.target.closest('[data-scanfor]');if(sf){setTimeout(()=>{$('#scanProd').value=sf.dataset.scanfor;markDuplicates();renderReview();},0);}
+  const ack=e.target.closest('[data-ack]');if(ack){ack.disabled=true;const n=document.getElementById('note-'+ack.dataset.ack);
+    try{await api('revisiones/'+encodeURIComponent(ack.dataset.ack),{method:'POST',body:{nota:n?n.value:''}});toast('Cambio marcado como revisado');await refresh();}catch(err){ack.disabled=false;toast(err.message);}}
+  const un=e.target.closest('[data-unack]');if(un){try{await api('revisiones/'+encodeURIComponent(un.dataset.unack),{method:'DELETE'});await refresh();}catch(err){toast(err.message);}}
+  const an=e.target.closest('[data-anular]');if(an){const cell=an.parentElement;
+    cell.innerHTML='<div class="inline-form"><input placeholder="Motivo de la anulación" aria-label="Motivo de la anulación" id="mot-'+esc(an.dataset.anular)+'"><button class="primary" type="button" data-anularok="'+esc(an.dataset.anular)+'">Anular</button><button type="button" data-cancel="1">Cancelar</button></div>';
+    document.getElementById('mot-'+an.dataset.anular).focus();}
+  const ok=e.target.closest('[data-anularok]');if(ok){const m=document.getElementById('mot-'+ok.dataset.anularok).value.trim();if(!m){toast('Indica el motivo de la anulación.');return;}
+    try{await api('recepciones/'+encodeURIComponent(ok.dataset.anularok)+'/anular',{method:'POST',body:{motivo:m}});toast('Recepción anulada');await refresh();}catch(err){toast(err.message);}}
+  if(e.target.closest('[data-cancel]'))render();
+  const ua=e.target.closest('[data-useract]');if(ua){try{await api('usuarios/'+ua.dataset.uid+'/'+ua.dataset.useract,{method:'POST'});await loadUsers();}catch(err){toast(err.message);}}
+});
+document.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-go]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();location.hash='p-'+encodeURIComponent(tr.dataset.go);}});
+$('#chFilter').addEventListener('change',renderChanges);$('#chProd').addEventListener('change',renderChanges);
+
+$('#prodForm').addEventListener('submit',async e=>{e.preventDefault();
+  const provs=$('#pRefs').value.split(',').map(s=>s.trim()).filter(Boolean).map(s=>({codigo:'',nombre:s}));
+  try{await api('productos',{method:'POST',body:{codigo:$('#pCode').value.trim(),nombre:$('#pName').value.trim(),proveedores:provs}});e.target.reset();$('#addProd').open=false;toast('Producto guardado');await refresh();}
+  catch(err){toast(err.message);}});
+
+/* ---------- usuarios ---------- */
+async function loadUsers(){try{const d=await api('usuarios');
+  $('#userTable').innerHTML='<table><thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead><tbody>'+
+   d.usuarios.map(u=>'<tr><td>'+esc(u.nombre)+'</td><td class="mono">'+esc(u.usuario)+'</td><td>'+(u.admin?'Administrador':'Usuario')+'</td><td>'+(u.activo?'<span class="chip ok">Activo</span>':'<span class="chip line">Desactivado</span>')+'</td>'+
+    '<td>'+(u.id===ME.id?'<span class="muted small">Tú</span>':'<button class="ghost" type="button" data-uid="'+u.id+'" data-useract="'+(u.activo?'desactivar':'activar')+'">'+(u.activo?'Desactivar':'Activar')+'</button>')+'</td></tr>').join('')+'</tbody></table>';}
+  catch(e){$('#userTable').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}}
+$('#userForm').addEventListener('submit',async e=>{e.preventDefault();
+  try{await api('usuarios',{method:'POST',body:{nombre:$('#uNombre').value.trim(),usuario:$('#uUsuario').value.trim(),clave:$('#uClave').value,admin:$('#uAdmin').checked}});e.target.reset();toast('Usuario creado');loadUsers();}
+  catch(err){toast(err.message);}});
+
+$('#histFile').addEventListener('change',e=>{$('#histBtn').disabled=!e.target.files[0];});
+$('#histBtn').addEventListener('click',async()=>{const f=$('#histFile').files[0];if(!f)return;$('#histBtn').disabled=true;
+  try{const datos=JSON.parse(await f.text());const r=await api('historico',{method:'POST',body:{datos,archivo:f.name}});
+    toast('Cargadas '+r.recepciones+' recepciones del producto '+r.producto);$('#histFile').value='';await refresh();}
+  catch(err){toast(err instanceof SyntaxError?'El archivo no es un JSON válido.':err.message);$('#histBtn').disabled=false;}});
+
+/* ---------- registrar hoja ---------- */
+let file=null,fileKind=null,draft=[];
+function scanStatus(m,err){const s=$('#scanStatus');s.textContent=m;s.classList.toggle('err',!!err);}
+function pickFile(f,kind){file=f;fileKind=f?kind:null;const pv=$('#scanPreview');
+  if(!f){pv.textContent='Sin archivo';}
+  else if(kind==='img'){pv.innerHTML='<img alt="Hoja escaneada" src="'+URL.createObjectURL(f)+'">';$('#pdfFile').value='';}
+  else{pv.textContent='PDF: '+f.name;$('#scanFile').value='';}
+  $('#scanBtn').disabled=!f;}
+$('#scanFile').addEventListener('change',e=>pickFile(e.target.files[0]||null,'img'));
+$('#pdfFile').addEventListener('change',e=>pickFile(e.target.files[0]||null,'pdf'));
+$('#scanBtn').addEventListener('click',async()=>{if(!file)return;$('#scanBtn').disabled=true;
+  scanStatus(fileKind==='pdf'?'Leyendo el PDF…':'Leyendo la hoja… puede tardar hasta un minuto.');
+  try{const b64=await fileB64(file);
+    const res=fileKind==='pdf'?await api('importar-pdf',{method:'POST',body:{pdf:b64}}):await api('leer-hoja',{method:'POST',body:{imagen:b64,tipo:file.type,producto:$('#scanProd').value}});
+    if(res.producto&&prod(res.producto)&&!$('#scanProd').value)$('#scanProd').value=res.producto;
+    if(res.producto&&!prod(res.producto))scanStatus('La hoja indica el producto '+res.producto+', que aún no existe. Créalo en el Panel antes de confirmar.',true);
+    else scanStatus('Leídas '+res.filas.length+' filas'+(fileKind==='img'?'. Revisa las marcadas en amarillo.':'.'));
+    draft=res.filas.map(r=>Object.assign({incluir:true},r,{dudas:r.dudas||[]}));markDuplicates();renderReview();
+  }catch(err){scanStatus(err.message,true);}finally{$('#scanBtn').disabled=!file;}});
+$('#scanProd').addEventListener('change',()=>{markDuplicates();renderReview();});
+
+function markDuplicates(){const p=prod($('#scanProd').value);const ex=p?p.recepciones.filter(r=>!r.anulada):[];
+  draft.forEach(d=>{d.dup=!!ex.find(r=>r.fecha===d.fecha&&norm(r.lote)===norm(d.lote)&&String(r.fiv||'')===String(d.fiv||''));if(d.dup)d.incluir=false;});}
+function diff(a,b){const t=[];if(norm(a.lote)!==norm(b.lote))t.push('lote');if(a.proveedor&&b.proveedor&&norm(a.proveedor)!==norm(b.proveedor))t.push('proveedor');if(!t.includes('lote')&&a.caducidad&&b.caducidad&&a.caducidad!==b.caducidad)t.push('caducidad');return t;}
+function draftChanges(){const p=prod($('#scanProd').value);const m=(p?p.recepciones.filter(r=>!r.anulada):[]).map(r=>Object.assign({},r));
+  draft.forEach((d,i)=>{if(d.incluir)m.push(Object.assign({},d,{_i:i}));});
+  const fv=r=>parseInt(String(r.fiv||'').replace(/\D/g,''),10)||0;
+  m.sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||(fv(a)-fv(b)));
+  const out={};for(let k=1;k<m.length;k++){if(m[k]._i!=null){const t=diff(m[k-1],m[k]);if(t.length)out[m[k]._i]=t;}}return out;}
+function renderReview(){
+  const area=$('#reviewArea');
+  if(!draft.length){area.className='empty';area.innerHTML='<b>Aún no hay filas</b>Lee una hoja o añade una recepción a mano.';$('#confirmBtn').disabled=true;return;}
+  const code=$('#scanProd').value,p=prod(code),ch=draftChanges();
+  const sups=(p?p.proveedores:[]).map(x=>'<option value="'+esc(x.nombre)+'"></option>').join('');
+  const f=(i,k,type)=>'<input class="'+(draft[i].dudas.includes(k)?'doubt':'')+'" '+(type?'type="'+type+'"':'')+' id="d'+i+'-'+k+'" data-i="'+i+'" data-k="'+k+'" value="'+esc(draft[i][k])+'" aria-label="'+k+'"'+(k==='proveedor'?' list="supList"':'')+'>';
+  area.className='tbl-wrap';
+  area.innerHTML='<datalist id="supList">'+sups+'</datalist><table class="review-tbl"><thead><tr><th>Incluir</th><th>Fecha</th><th>Proveedor</th><th>Cajas</th><th>Nº lote</th><th>Caducidad</th><th>Nº FIV</th><th>Firma</th><th>Notas</th></tr></thead><tbody>'+
+   draft.map((d,i)=>'<tr class="'+(d.dudas.length?'doubt ':'')+(d.dup?'dup':'')+'"><td><input type="checkbox" id="d'+i+'-inc" data-i="'+i+'" data-k="incluir" '+(d.incluir?'checked':'')+' aria-label="Incluir fila"></td>'+
+    '<td class="w-date">'+f(i,'fecha','date')+'</td><td class="w-sup">'+f(i,'proveedor')+'</td><td class="w-sm">'+f(i,'cajas')+'</td><td class="w-lot">'+f(i,'lote')+'</td><td class="w-date">'+f(i,'caducidad','date')+'</td><td class="w-lot">'+f(i,'fiv')+'</td><td class="w-sm">'+f(i,'firma')+'</td>'+
+    '<td style="min-width:160px" class="small">'+(d.dup?'<span class="chip line">Ya registrada</span> ':'')+(ch[i]?'<span class="chip acc">Cambio de '+ch[i].join(' y ')+'</span> ':'')+'<div class="muted">'+esc(d.nota)+'</div></td></tr>').join('')+'</tbody></table>';
+  const n=draft.filter(d=>d.incluir).length;
+  $('#confirmBtn').disabled=!(n&&code);$('#confirmBtn').textContent=code?'Confirmar '+n+' fila'+(n===1?'':'s'):'Elige el producto para confirmar';
+}
+$('#reviewArea').addEventListener('input',e=>{const t=e.target;if(t.dataset.i==null)return;const d=draft[+t.dataset.i];
+  if(t.dataset.k==='incluir'){d.incluir=t.checked;renderReview();return;}
+  d[t.dataset.k]=t.value;d.dudas=d.dudas.filter(x=>x!==t.dataset.k);t.classList.remove('doubt');});
+$('#reviewArea').addEventListener('change',e=>{if(e.target.dataset.k&&e.target.dataset.k!=='incluir'){const id=e.target.id;renderReview();const el=document.getElementById(id);if(el)el.focus();}});
+$('#addManual').addEventListener('click',()=>{draft.push({incluir:true,fecha:today(),proveedor:'',cajas:'',lote:'',caducidad:'',fiv:'',firma:'',dudas:[],nota:'',origen:'manual'});renderReview();const el=document.getElementById('d'+(draft.length-1)+'-lote');if(el)el.focus();});
+$('#confirmBtn').addEventListener('click',async()=>{const code=$('#scanProd').value;if(!code)return;
+  const filas=draft.filter(d=>d.incluir);if(filas.some(d=>!d.fecha||!d.lote)){toast('Cada fila necesita al menos fecha y nº de lote.');return;}
+  $('#confirmBtn').disabled=true;scanStatus('Guardando…');
+  try{await api('recepciones',{method:'POST',body:{producto:code,filas}});toast(filas.length+' recepción'+(filas.length===1?'':'es')+' guardada'+(filas.length===1?'':'s'));
+    draft=[];pickFile(null);$('#scanFile').value='';$('#pdfFile').value='';renderReview();scanStatus('');await refresh();location.hash='p-'+encodeURIComponent(code);}
+  catch(err){scanStatus(err.message,true);$('#confirmBtn').disabled=false;}});
+
+/* ---------- arranque ---------- */
+async function arrancar(){
+  try{INFO=await api('inicio');}catch(e){document.body.innerHTML='<p style="padding:24px">No se puede conectar con el servidor.</p>';return;}
+  ME=INFO.usuario;
+  if(!ME){showLogin();return;}
+  $('#topbar').hidden=false;$('#whoName').textContent=ME.nombre;$('#tabUsuarios').hidden=!ME.admin;
+  $('#imgLabel').hidden=!INFO.lectura_ia;$('#pdfLabel').hidden=!INFO.importar_pdf;
+  if(!INFO.lectura_ia&&!INFO.importar_pdf)scanStatus('La lectura de hojas no está configurada en este servidor. Añade las filas a mano.');
+  else if(!INFO.lectura_ia)scanStatus('La lectura de fotos no está configurada: usa el PDF rellenable o añade las filas a mano.');
+  await refresh();route();
+}
+setInterval(()=>{if(ME&&document.visibilityState==='visible'&&view!=='registrar'&&!document.activeElement.closest('input'))refresh();},30000);
+arrancar();
+})();
+</script>
+</body>
+</html>

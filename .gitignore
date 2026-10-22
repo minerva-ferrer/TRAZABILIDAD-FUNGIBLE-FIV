@@ -1,0 +1,20 @@
+# Datos reales: nunca al repositorio
+datos/*
+!datos/.gitkeep
+!datos/config.ejemplo.json
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Históricos reales: tienen datos del laboratorio y el repositorio es público
+historico/*.json
