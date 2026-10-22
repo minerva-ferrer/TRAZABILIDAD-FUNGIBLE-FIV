@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONUTF8: "1"
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -32,7 +35,15 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
 
       - name: Pruebas automáticas
-        run: python -m unittest discover -s pruebas -v
+        shell: pwsh
+        run: |
+          python -m unittest discover -s pruebas -v *> pruebas.log
+          $codigo = $LASTEXITCODE
+          Get-Content pruebas.log
+          if ($codigo -ne 0) {
+            Get-Content pruebas.log | Select-Object -Last 40 | ForEach-Object { Write-Output "::error::$_" }
+            exit 1
+          }
 
       - name: Crear TrazabilidadFIV.exe
         run: >
