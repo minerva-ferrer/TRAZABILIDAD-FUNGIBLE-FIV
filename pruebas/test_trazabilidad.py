@@ -15,7 +15,6 @@ import tempfile
 import threading
 import unittest
 import urllib.request
-from http.cookiejar import CookieJar
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -95,17 +94,23 @@ class Api(unittest.TestCase):
         cls.srv = app.ThreadingHTTPServer(("127.0.0.1", 0), app.Manejador)
         cls.url = f"http://127.0.0.1:{cls.srv.server_address[1]}/api/"
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
-        cls.op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+        cls.cookie = ""  # la sesión se gestiona a mano: igual en todas las versiones de Python
 
     @classmethod
     def tearDownClass(cls):
         cls.srv.shutdown()
 
     def llamar(self, ruta, cuerpo=None, metodo=None):
+        cab = {"Content-Type": "application/json"}
+        if Api.cookie:
+            cab["Cookie"] = Api.cookie
         req = urllib.request.Request(self.url + ruta, data=json.dumps(cuerpo).encode() if cuerpo is not None else None,
-                                     headers={"Content-Type": "application/json"}, method=metodo or ("POST" if cuerpo is not None else "GET"))
+                                     headers=cab, method=metodo or ("POST" if cuerpo is not None else "GET"))
         try:
-            with self.op.open(req) as r:
+            with urllib.request.urlopen(req) as r:
+                galleta = r.headers.get("Set-Cookie")
+                if galleta:
+                    Api.cookie = galleta.split(";", 1)[0]
                 return r.status, json.loads(r.read() or b"{}")
         except urllib.error.HTTPError as e:
             return e.code, json.loads(e.read() or b"{}")
