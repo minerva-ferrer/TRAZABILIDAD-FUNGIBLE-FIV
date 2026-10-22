@@ -28,6 +28,6 @@ DATOS
 HOJAS EN PDF
 - En la ficha de cada producto, "Descargar hoja en blanco (PDF)".
 
-LECTURA DE FOTOS (opcional)
+LECTURA DE HOJAS ESCANEADAS EN PDF O FOTOS (opcional)
 - Copia config.ejemplo.json dentro de la carpeta "datos" con el nombre config.json,
   pon la clave de la API de Anthropic y reinicia el programa.

@@ -42,7 +42,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 EMPAQUETADO = getattr(sys, "frozen", False)  # programa .exe generado en GitHub
 # Recursos de solo lectura (interfaz, histórico, fuentes): junto al código o dentro del .exe
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -356,7 +356,7 @@ def cargar_historico(con, usuario_id=None, solo_si_vacio=False) -> int:
 
 
 # ------------------------------------------------- lectura de hojas
-PROMPT_HOJA = """La imagen es una hoja manuscrita de registro de recepción de material fungible de un laboratorio de FIV. Puede ser de dos tipos:
+PROMPT_HOJA = """La imagen (o el PDF escaneado, que puede tener varias páginas) es una hoja manuscrita de registro de recepción de material fungible de un laboratorio de FIV. Puede ser de dos tipos:
 (a) Plantilla nueva: cabecera con el código de producto impreso junto al QR (p. ej. "PROD 327-26") y una tabla con una fila por recepción: Fecha (DD/MM/AA), Proveedor (escrito a mano en una línea), Cajas, Nº lote (una cifra por casilla), Caducidad (DD/MM/AA), Nº FIV, Firma y casilla "Cambio".
 (b) Hoja antigua: bloques verticales con "Data Recepció", "Nº Caixes", "Nº Lot", "Caducitat" y "NºFIV", en varias columnas que se leen de arriba abajo y luego de izquierda a derecha. Junto a la fecha puede haber el nombre del proveedor y una letra (la inicial de quien recibió).
 {contexto}
@@ -379,7 +379,9 @@ def leer_hoja_ia(imagen_b64: str, media_type: str, producto: dict | None, produc
         "model": cfg.get("anthropic_model", "claude-sonnet-5-5"),
         "max_tokens": 8000,
         "messages": [{"role": "user", "content": [
-            {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": imagen_b64}},
+            ({"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": imagen_b64}}
+             if media_type == "application/pdf" else
+             {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": imagen_b64}}),
             {"type": "text", "text": PROMPT_HOJA.format(contexto=contexto)},
         ]}],
     }
@@ -408,24 +410,39 @@ def leer_hoja_ia(imagen_b64: str, media_type: str, producto: dict | None, produc
             "fecha": str(r.get("date") or ""), "proveedor": str(r.get("supplier") or ""), "cajas": str(r.get("boxes") or ""),
             "lote": re.sub(r"\s+", "", str(r.get("lot") or "")), "caducidad": str(r.get("expiry") or ""),
             "fiv": str(r.get("fiv") or ""), "firma": str(r.get("initial") or ""),
-            "dudas": [str(x) for x in (r.get("doubtful") or [])], "nota": str(r.get("note") or ""), "origen": "foto",
+            "dudas": [str(x) for x in (r.get("doubtful") or [])], "nota": str(r.get("note") or ""), "origen": "escaneo",
         })
     codigo = str(datos.get("product_code") or "").replace("PROD", "").strip() or None
     return {"producto": codigo, "filas": filas}
 
 
-def importar_pdf(pdf_b64: str) -> dict:
+def importar_pdf(pdf_b64: str, producto: dict | None = None, productos: list | None = None) -> dict:
+    """PDF rellenado en el ordenador: lee sus campos. PDF escaneado: lo lee con la lectura automática."""
+    try:
+        return leer_campos_pdf(pdf_b64)
+    except PdfSinCampos:
+        if leer_config().get("anthropic_api_key"):
+            return leer_hoja_ia(pdf_b64, "application/pdf", producto, productos or [])
+        raise ErrorUsuario(501, "Este PDF es una hoja escaneada. Para leerlo hace falta activar la lectura automática "
+                                "(ver README); mientras tanto, añade las filas a mano.")
+
+
+class PdfSinCampos(Exception):
+    pass
+
+
+def leer_campos_pdf(pdf_b64: str) -> dict:
     try:
         from pypdf import PdfReader
     except ImportError:
-        raise ErrorUsuario(501, "Para importar PDF rellenables hay que instalar el paquete pypdf (pip install pypdf).")
+        raise PdfSinCampos()
     try:
         lector = PdfReader(io.BytesIO(base64.b64decode(pdf_b64)))
         campos = lector.get_fields() or {}
     except Exception:
         raise ErrorUsuario(400, "No se pudo abrir el PDF. Comprueba que es la hoja rellenable.")
     if not campos:
-        raise ErrorUsuario(400, "Este PDF no tiene campos rellenables. Si es un escaneo, súbelo como imagen.")
+        raise PdfSinCampos()
     v = {k: (str(c.get("/V") or "").strip() if isinstance(c, dict) else "") for k, c in campos.items()}
     v = {k: ("" if x in ("/Off", "None") else x) for k, x in v.items()}
     codigo = v.get("producto") or None
@@ -460,6 +477,9 @@ def importar_pdf(pdf_b64: str) -> dict:
             "firma": v.get(f"{p}_firma", ""), "dudas": dudas, "origen": "pdf",
             "nota": ("Marcada como cambio en la hoja. " if v.get(f"{p}_cambio") else "") + ("Fecha no válida en el PDF." if dudas else ""),
         })
+    if not filas:
+        # La hoja rellenable se imprimió, se escribió a mano y se escaneó: los campos están vacíos
+        raise PdfSinCampos()
     return {"producto": codigo, "filas": filas, "hoja": v.get("hoja_num", "")}
 
 
@@ -490,7 +510,7 @@ def validar_recepcion(r: dict) -> dict:
         "proveedor": texto_limpio(r.get("proveedor"), 80), "cajas": texto_limpio(r.get("cajas"), 40),
         "fiv": texto_limpio(r.get("fiv"), 20), "firma": texto_limpio(r.get("firma"), 10),
         "notas": texto_limpio(r.get("nota") or r.get("notas"), 400),
-        "origen": r.get("origen") if r.get("origen") in ("manual", "foto", "pdf") else "manual",
+        "origen": r.get("origen") if r.get("origen") in ("manual", "escaneo", "pdf") else "manual",
     }
 
 
@@ -779,8 +799,12 @@ class Manejador(BaseHTTPRequestHandler):
         if partes == ["importar-pdf"] and metodo == "POST":
             b = self.cuerpo()
             if not b.get("pdf"):
-                raise ErrorUsuario(400, "Sube el PDF rellenado.")
-            return self.json(200, importar_pdf(b["pdf"]))
+                raise ErrorUsuario(400, "Sube el PDF de la hoja.")
+            est = estado(con)["productos"]
+            prod = next((p for p in est if p["codigo"] == b.get("producto")), None)
+            res = importar_pdf(b["pdf"], prod, est)
+            auditar(con, u["id"], "leer_pdf", {"producto": b.get("producto"), "filas": len(res["filas"]), "origen": res["filas"][0]["origen"] if res["filas"] else ""})
+            return self.json(200, res)
 
         if len(partes) == 2 and partes[0] == "exportar" and metodo == "GET":
             return self.exportar(con, partes[1], u)

@@ -182,11 +182,8 @@ input.doubt{border-color:var(--warn);border-width:2px}
     <div class="scan-grid">
       <div class="panel pad" style="display:flex;flex-direction:column;gap:12px">
         <label for="scanProd">Producto<select id="scanProd"></select></label>
-        <label for="pdfFile" id="pdfLabel">PDF rellenado
-          <input id="pdfFile" type="file" accept="application/pdf">
-        </label>
-        <label for="scanFile" id="imgLabel">Foto o escaneo de la hoja (JPG o PNG)
-          <input id="scanFile" type="file" accept="image/jpeg,image/png,image/webp">
+        <label for="scanFile">Hoja (PDF rellenado, PDF escaneado o foto)
+          <input id="scanFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp">
         </label>
         <div class="preview" id="scanPreview">Sin archivo</div>
         <div class="row"><button class="primary" id="scanBtn" type="button" disabled>Leer hoja</button></div>
@@ -425,20 +422,19 @@ $('#histBtn').addEventListener('click',async()=>{const f=$('#histFile').files[0]
 /* ---------- registrar hoja ---------- */
 let file=null,fileKind=null,draft=[];
 function scanStatus(m,err){const s=$('#scanStatus');s.textContent=m;s.classList.toggle('err',!!err);}
-function pickFile(f,kind){file=f;fileKind=f?kind:null;const pv=$('#scanPreview');
+function pickFile(f){file=f;fileKind=f?((f.type==='application/pdf'||/\.pdf$/i.test(f.name))?'pdf':'img'):null;const pv=$('#scanPreview');
   if(!f){pv.textContent='Sin archivo';}
-  else if(kind==='img'){pv.innerHTML='<img alt="Hoja escaneada" src="'+URL.createObjectURL(f)+'">';$('#pdfFile').value='';}
-  else{pv.textContent='PDF: '+f.name;$('#scanFile').value='';}
+  else if(fileKind==='img'){pv.innerHTML='<img alt="Hoja escaneada" src="'+URL.createObjectURL(f)+'">';}
+  else{pv.textContent='PDF: '+f.name;}
   $('#scanBtn').disabled=!f;}
-$('#scanFile').addEventListener('change',e=>pickFile(e.target.files[0]||null,'img'));
-$('#pdfFile').addEventListener('change',e=>pickFile(e.target.files[0]||null,'pdf'));
+$('#scanFile').addEventListener('change',e=>pickFile(e.target.files[0]||null));
 $('#scanBtn').addEventListener('click',async()=>{if(!file)return;$('#scanBtn').disabled=true;
   scanStatus(fileKind==='pdf'?'Leyendo el PDF…':'Leyendo la hoja… puede tardar hasta un minuto.');
   try{const b64=await fileB64(file);
-    const res=fileKind==='pdf'?await api('importar-pdf',{method:'POST',body:{pdf:b64}}):await api('leer-hoja',{method:'POST',body:{imagen:b64,tipo:file.type,producto:$('#scanProd').value}});
+    const res=fileKind==='pdf'?await api('importar-pdf',{method:'POST',body:{pdf:b64,producto:$('#scanProd').value}}):await api('leer-hoja',{method:'POST',body:{imagen:b64,tipo:file.type,producto:$('#scanProd').value}});
     if(res.producto&&prod(res.producto)&&!$('#scanProd').value)$('#scanProd').value=res.producto;
     if(res.producto&&!prod(res.producto))scanStatus('La hoja indica el producto '+res.producto+', que aún no existe. Créalo en el Panel antes de confirmar.',true);
-    else scanStatus('Leídas '+res.filas.length+' filas'+(fileKind==='img'?'. Revisa las marcadas en amarillo.':'.'));
+    else scanStatus('Leídas '+res.filas.length+' filas'+(res.filas.some(r=>r.origen==='escaneo')?'. Revisa las marcadas en amarillo.':'.'));
     draft=res.filas.map(r=>Object.assign({incluir:true},r,{dudas:r.dudas||[]}));markDuplicates();renderReview();
   }catch(err){scanStatus(err.message,true);}finally{$('#scanBtn').disabled=!file;}});
 $('#scanProd').addEventListener('change',()=>{markDuplicates();renderReview();});
@@ -474,7 +470,7 @@ $('#confirmBtn').addEventListener('click',async()=>{const code=$('#scanProd').va
   const filas=draft.filter(d=>d.incluir);if(filas.some(d=>!d.fecha||!d.lote)){toast('Cada fila necesita al menos fecha y nº de lote.');return;}
   $('#confirmBtn').disabled=true;scanStatus('Guardando…');
   try{await api('recepciones',{method:'POST',body:{producto:code,filas}});toast(filas.length+' recepción'+(filas.length===1?'':'es')+' guardada'+(filas.length===1?'':'s'));
-    draft=[];pickFile(null);$('#scanFile').value='';$('#pdfFile').value='';renderReview();scanStatus('');await refresh();location.hash='p-'+encodeURIComponent(code);}
+    draft=[];pickFile(null);$('#scanFile').value='';renderReview();scanStatus('');await refresh();location.hash='p-'+encodeURIComponent(code);}
   catch(err){scanStatus(err.message,true);$('#confirmBtn').disabled=false;}});
 
 /* ---------- arranque ---------- */
@@ -483,9 +479,7 @@ async function arrancar(){
   ME=INFO.usuario;
   if(!ME){showLogin();return;}
   $('#topbar').hidden=false;$('#whoName').textContent=ME.nombre;$('#tabUsuarios').hidden=!ME.admin;
-  $('#imgLabel').hidden=!INFO.lectura_ia;$('#pdfLabel').hidden=!INFO.importar_pdf;
-  if(!INFO.lectura_ia&&!INFO.importar_pdf)scanStatus('La lectura de hojas no está configurada en este servidor. Añade las filas a mano.');
-  else if(!INFO.lectura_ia)scanStatus('La lectura de fotos no está configurada: usa el PDF rellenable o añade las filas a mano.');
+  if(!INFO.lectura_ia)scanStatus('La lectura automática de hojas escaneadas y fotos no está activada: puedes subir el PDF rellenado en el ordenador o añadir las filas a mano.');
   await refresh();route();
 }
 setInterval(()=>{if(ME&&document.visibilityState==='visible'&&view!=='registrar'&&!document.activeElement.closest('input'))refresh();},30000);

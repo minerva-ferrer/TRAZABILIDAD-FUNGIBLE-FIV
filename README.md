@@ -3,7 +3,7 @@
 Aplicación web para registrar las recepciones de material fungible del laboratorio y detectar automáticamente **cada cambio de lote, proveedor o caducidad** entre dos recepciones seguidas del mismo producto. Cada cambio queda pendiente hasta que alguien lo marca como revisado, con su nombre, la fecha y una nota.
 
 - **Panel:** lote en uso de cada producto, caducidad y cambios pendientes de revisar.
-- **Registrar hoja:** importa la hoja PDF rellenada en el ordenador, lee la foto de una hoja manuscrita (opcional) o permite teclear las filas. Siempre hay un paso de revisión antes de guardar.
+- **Registrar hoja:** importa la hoja PDF rellenada en el ordenador, lee la hoja en papel escaneada en PDF o fotografiada (opcional) o permite teclear las filas. Siempre hay un paso de revisión antes de guardar.
 - **Ficha de producto:** historia de lotes, todas las recepciones y avisos (posibles duplicados, falta de nº FIV, fechas fuera de orden).
 - **Cambios:** registro de cambios con su revisión; exportable a CSV.
 - **Usuarios y auditoría:** cada acción queda registrada con usuario y hora. Las recepciones no se borran: se **anulan** con un motivo.
@@ -72,7 +72,7 @@ La carpeta `datos/` y los históricos están excluidos del repositorio: **los da
 En `plantillas/` está la hoja del 327-26 en PDF (A4 vertical) con dos usos:
 
 - **Rellenarla en el ordenador** con Acrobat Reader, Chrome o Edge. Después se sube en **Registrar hoja → PDF rellenado** y los datos se leen tal cual, sin errores de lectura.
-- **Imprimirla** y rellenarla a mano. Para registrarla, se fotografía y se sube como imagen (requiere la lectura automática, ver abajo) o se teclean las filas.
+- **Imprimirla** y rellenarla a mano. Para registrarla, se escanea en **PDF** (o se fotografía) y se sube en **Registrar hoja**; requiere la lectura automática (ver abajo). Sin ella, se teclean las filas.
 
 Para crear la hoja de otro producto (necesita `reportlab`):
 
@@ -83,14 +83,14 @@ python herramientas/generar_hoja.py --todos     # una hoja por cada producto dad
 
 ---
 
-## Lectura automática de fotos (opcional)
+## Lectura automática de hojas escaneadas y fotos (opcional)
 
-Para leer fotos de hojas manuscritas, el programa usa la API de Anthropic (Claude). Hace falta una clave de API de la clínica, que se crea en [console.anthropic.com](https://console.anthropic.com).
+Para leer hojas manuscritas escaneadas en PDF o fotografiadas, el programa usa la API de Anthropic (Claude). Hace falta una clave de API de la clínica, que se crea en [console.anthropic.com](https://console.anthropic.com).
 
 1. Copia `datos/config.ejemplo.json` como `datos/config.json`.
 2. Pon tu clave en `anthropic_api_key` y reinicia el programa.
 
-Ten en cuenta que **la foto de la hoja se envía a Anthropic** para leerla. Las hojas no deben contener datos de pacientes. Si preferís que ninguna imagen salga de la clínica, no configures la clave: el PDF rellenable y la entrada manual funcionan igual.
+Ten en cuenta que **el escaneo o la foto de la hoja se envía a Anthropic** para leerla. Las hojas no deben contener datos de pacientes. Si preferís que ninguna imagen salga de la clínica, no configures la clave: el PDF rellenable y la entrada manual funcionan igual.
 
 ---
 

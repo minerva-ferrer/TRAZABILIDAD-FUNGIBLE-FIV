@@ -87,6 +87,40 @@ class Logica(unittest.TestCase):
         self.assertEqual(str(app.fin_caducidad("2015-12")), "2015-12-31")
 
 
+class Pdf(unittest.TestCase):
+    def pdf_b64(self, ruta=None):
+        import base64, io
+        from pypdf import PdfWriter
+        w = PdfWriter(clone_from=ruta) if ruta else PdfWriter()
+        if not ruta:
+            w.add_blank_page(595, 842)
+        b = io.BytesIO()
+        w.write(b)
+        return base64.b64encode(b.getvalue()).decode()
+
+    def test_pdf_escaneado_sin_lectura_automatica(self):
+        with self.assertRaises(app.ErrorUsuario) as e:
+            app.importar_pdf(self.pdf_b64())
+        self.assertEqual(e.exception.estado, 501)
+
+    def test_hoja_rellenable_impresa_y_escaneada(self):
+        # Hoja rellenable con los campos vacíos: se trata como un escaneo
+        with self.assertRaises(app.ErrorUsuario) as e:
+            app.importar_pdf(self.pdf_b64(str(RAIZ / "plantillas" / "Hoja_recepcion_327-26.pdf")))
+        self.assertEqual(e.exception.estado, 501)
+
+    def test_pdf_escaneado_va_a_lectura_automatica(self):
+        llamadas = []
+        original, cfg = app.leer_hoja_ia, app.leer_config
+        app.leer_hoja_ia = lambda b64, tipo, p, ps: llamadas.append(tipo) or {"producto": None, "filas": []}
+        app.leer_config = lambda: {"anthropic_api_key": "prueba"}
+        try:
+            app.importar_pdf(self.pdf_b64())
+        finally:
+            app.leer_hoja_ia, app.leer_config = original, cfg
+        self.assertEqual(llamadas, ["application/pdf"])
+
+
 class Api(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
