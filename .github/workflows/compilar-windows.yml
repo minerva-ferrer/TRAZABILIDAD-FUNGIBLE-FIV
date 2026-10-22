@@ -1,10 +1,11 @@
 # Genera el programa para Windows (TrazabilidadFIV.exe) sin que nadie tenga que instalar Python.
-# Se ejecuta al publicar una versión (etiqueta v1.0.0, v1.1.0…) o a mano desde la pestaña Actions.
+# Se ejecuta en cada cambio de la rama main o a mano desde la pestaña Actions.
+# Publica (o actualiza) la versión vX.Y.Z indicada en VERSION dentro de app.py.
 name: Compilar programa para Windows
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +20,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Leer versión
+        id: ver
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path app.py -Pattern '^VERSION = "(.+)"').Matches[0].Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
 
       - name: Instalar dependencias
         run: pip install -r requirements.txt pyinstaller
@@ -51,8 +59,14 @@ jobs:
           name: TrazabilidadFIV-windows
           path: TrazabilidadFIV-windows.zip
 
-      - name: Adjuntar a la versión publicada
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publicar la versión con el programa
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Trazabilidad FIV ${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            Descarga **TrazabilidadFIV-windows.zip**, descomprímelo y abre `TrazabilidadFIV.exe`.
+            Instrucciones en `LEEME-WINDOWS.txt` dentro del ZIP.
           files: TrazabilidadFIV-windows.zip

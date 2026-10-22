@@ -24,7 +24,7 @@ GitHub genera el programa listo para usar, `TrazabilidadFIV.exe`. No hace falta 
 
 Los datos se guardan en la carpeta `datos`, junto al `.exe`. Para actualizar a una versión nueva, sustituye solo el `.exe`.
 
-**Publicar una versión nueva** (lo hace quien mantenga el código): en GitHub, **Releases → Draft a new release**, crea una etiqueta nueva (`v1.1.0`) y pulsa **Publish release**. En unos minutos, la pestaña **Actions** compila el programa y lo adjunta a la versión.
+**Versiones nuevas:** cada cambio en la rama `main` hace que GitHub compile el programa (pestaña **Actions**, unos 5 minutos) y lo publique en **Releases** con el número de `VERSION` de `app.py`. Para sacar una versión nueva, sube ese número (por ejemplo a `1.1.0`).
 
 ## Instalación en Windows con Python
 
